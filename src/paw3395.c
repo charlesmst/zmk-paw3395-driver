@@ -369,6 +369,53 @@ static int paw3395_init_irq(const struct device *dev) {
     return err;
 }
 
+#if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
+static void paw3395_rate_cycle_work_cb(struct k_work *work) {
+    struct k_work_delayable *dwork = CONTAINER_OF(work, struct k_work_delayable, work);
+    struct pixart_data *data = CONTAINER_OF(dwork, struct pixart_data, rate_cycle_work);
+    const struct device *dev = data->dev;
+    const struct pixart_config *config = dev->config;
+
+    data->rate_cycle_idx = (data->rate_cycle_idx + 1) % config->rate_cycle_rates_count;
+    data->report_interval_ms = config->rate_cycle_rates_ms[data->rate_cycle_idx];
+    LOG_INF("report rate cycled to %d ms", data->report_interval_ms);
+
+    gpio_pin_interrupt_configure_dt(&config->rate_cycle_gpio, GPIO_INT_EDGE_TO_ACTIVE);
+}
+
+static void paw3395_rate_cycle_gpio_cb(const struct device *gpiob, struct gpio_callback *cb,
+                                       uint32_t pins) {
+    struct pixart_data *data = CONTAINER_OF(cb, struct pixart_data, rate_cycle_gpio_cb);
+    const struct device *dev = data->dev;
+    const struct pixart_config *config = dev->config;
+
+    gpio_pin_interrupt_configure_dt(&config->rate_cycle_gpio, GPIO_INT_DISABLE);
+    k_work_schedule(&data->rate_cycle_work, K_MSEC(50));
+}
+
+static int paw3395_init_rate_cycle_gpio(const struct device *dev) {
+    struct pixart_data *data = dev->data;
+    const struct pixart_config *config = dev->config;
+
+    if (!gpio_is_ready_dt(&config->rate_cycle_gpio)) {
+        LOG_ERR("Rate-cycle GPIO not ready");
+        return -ENODEV;
+    }
+    int err = gpio_pin_configure_dt(&config->rate_cycle_gpio, GPIO_INPUT);
+    if (err) {
+        return err;
+    }
+    gpio_init_callback(&data->rate_cycle_gpio_cb, paw3395_rate_cycle_gpio_cb,
+                       BIT(config->rate_cycle_gpio.pin));
+    err = gpio_add_callback(config->rate_cycle_gpio.port, &data->rate_cycle_gpio_cb);
+    if (err) {
+        return err;
+    }
+    k_work_init_delayable(&data->rate_cycle_work, paw3395_rate_cycle_work_cb);
+    return gpio_pin_interrupt_configure_dt(&config->rate_cycle_gpio, GPIO_INT_EDGE_TO_ACTIVE);
+}
+#endif /* CONFIG_PAW3395_RATE_CYCLE_GPIO */
+
 static int paw3395_init(const struct device *dev) {
     struct pixart_data *data = dev->data;
     const struct pixart_config *config = dev->config;
@@ -406,6 +453,14 @@ static int paw3395_init(const struct device *dev) {
     if (err) {
         return err;
     }
+
+#if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
+    err = paw3395_init_rate_cycle_gpio(dev);
+    if (err) {
+        LOG_WRN("Rate-cycle GPIO init failed: %d (continuing)", err);
+        err = 0;
+    }
+#endif
 
     // Setup delayable and non-blocking init jobs, including following steps:
     // 1. power reset
@@ -494,7 +549,21 @@ static const struct sensor_driver_api paw3395_driver_api = {
 #define PAW3395_SPI_MODE (SPI_WORD_SET(8) | SPI_MODE_CPOL | SPI_MODE_CPHA | SPI_TRANSFER_MSB |     \
                           SPI_OP_MODE_MASTER | SPI_HOLD_ON_CS | SPI_LOCK_ON)
 
+#if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
+#define PAW3395_RATE_CYCLE_RATES(n)                                                                \
+    static const int32_t rate_cycle_rates_##n[] =                                                  \
+        DT_INST_PROP_OR(n, rate_cycle_rates_ms, ({8, 4, 1}));
+#define PAW3395_RATE_CYCLE_CFG(n)                                                                  \
+        .rate_cycle_gpio = GPIO_DT_SPEC_INST_GET(n, rate_cycle_gpios),                            \
+        .rate_cycle_rates_ms = rate_cycle_rates_##n,                                               \
+        .rate_cycle_rates_count = ARRAY_SIZE(rate_cycle_rates_##n),
+#else
+#define PAW3395_RATE_CYCLE_RATES(n)
+#define PAW3395_RATE_CYCLE_CFG(n)
+#endif
+
 #define PAW3395_DEFINE(n)                                                                          \
+    PAW3395_RATE_CYCLE_RATES(n)                                                                    \
     static struct pixart_data data##n;                                                             \
     static const struct pixart_config config##n = {                                                \
 		.id = n,                                                                                   \
@@ -511,6 +580,7 @@ static const struct sensor_driver_api paw3395_driver_api = {
         .init_retry_count = DT_PROP(DT_DRV_INST(n), init_retry_count),                             \
         .init_retry_interval = DT_PROP(DT_DRV_INST(n), init_retry_interval),                       \
         .power_mode = DT_PROP(DT_DRV_INST(n), power_mode),                                         \
+        PAW3395_RATE_CYCLE_CFG(n)                                                                   \
     };                                                                                             \
     DEVICE_DT_INST_DEFINE(n, paw3395_init, NULL, &data##n, &config##n, POST_KERNEL,                \
                           CONFIG_INPUT_PAW3395_INIT_PRIORITY, &paw3395_driver_api);

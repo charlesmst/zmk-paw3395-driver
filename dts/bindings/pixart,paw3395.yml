@@ -46,3 +46,16 @@ properties:
     type: int
     default: 100
     description: "Interval between initialization retries in ms"
+  rate-cycle-gpios:
+    type: phandle-array
+    description: |
+      Optional GPIO for a hardware rate-cycle button (e.g. DPI button).
+      On each falling edge the report interval advances through
+      rate-cycle-rates-ms and wraps around. Entirely local to the
+      peripheral — no central/keymap involvement.
+  rate-cycle-rates-ms:
+    type: array
+    description: |
+      Ordered list of report-interval values (ms) to cycle through when
+      rate-cycle-gpios is pressed. 0 = no limit. Defaults to 8 4 1
+      (120 Hz → 250 Hz → 1000 Hz) if not specified.

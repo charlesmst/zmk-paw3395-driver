@@ -42,7 +42,13 @@ extern "C"
     int64_t last_smp_time, last_rpt_time;
     int64_t dx, dy;
 
-    int32_t report_interval_ms; // runtime-adjustable report interval (0 = no limit)
+    int32_t report_interval_ms;
+
+#if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
+    struct gpio_callback rate_cycle_gpio_cb;
+    struct k_work_delayable rate_cycle_work;
+    uint8_t rate_cycle_idx;
+#endif
 };
 
 // device config data structure
@@ -61,6 +67,12 @@ struct pixart_config {
     uint8_t init_retry_count;
     uint16_t init_retry_interval;
     uint8_t power_mode;
+
+#if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
+    struct gpio_dt_spec rate_cycle_gpio;
+    const int32_t *rate_cycle_rates_ms;
+    size_t rate_cycle_rates_count;
+#endif
 };
 
 #ifdef __cplusplus
