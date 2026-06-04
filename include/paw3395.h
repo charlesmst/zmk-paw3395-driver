@@ -28,6 +28,9 @@ enum paw3395_attribute {
 	/** Sensor calibration. */
 	PAW3395_ATTR_CALIBRATE,
 
+	/** Runtime report interval in milliseconds (0 = no rate limit). */
+	PAW3395_ATTR_REPORT_INTERVAL_MS,
+
 };
 
 #if IS_ENABLED(CONFIG_REPORT_ATTR)

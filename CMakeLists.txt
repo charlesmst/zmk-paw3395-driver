@@ -1,5 +1,6 @@
 zephyr_library()
 zephyr_library_sources_ifdef(CONFIG_PAW3395 src/paw3395.c)
+zephyr_library_sources_ifdef(CONFIG_PAW3395_REPORT_RATE_CYCLE src/behavior_paw3395_report_rate_cycle.c)
 zephyr_include_directories(include)
 zephyr_include_directories(${APPLICATION_SOURCE_DIR}/include)
 

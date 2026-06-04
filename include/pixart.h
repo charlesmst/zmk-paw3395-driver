@@ -41,6 +41,8 @@ extern "C"
 
     int64_t last_smp_time, last_rpt_time;
     int64_t dx, dy;
+
+    int32_t report_interval_ms; // runtime-adjustable report interval (0 = no limit)
 };
 
 // device config data structure

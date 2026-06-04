@@ -265,9 +265,7 @@ static int paw3395_report_data(const struct device *dev) {
         return 0;
     }
 
-#if CONFIG_PAW3395_REPORT_INTERVAL_MIN > 0
     int64_t now = k_uptime_get();
-#endif
 
     int err = 0;
     err = paw3395_lib_motion_burst_read(&config->spi, buf, PAW3395_BURST_SIZE);
@@ -302,12 +300,9 @@ static int paw3395_report_data(const struct device *dev) {
     data->dx += x;
     data->dy += y;
 
-#if CONFIG_PAW3395_REPORT_INTERVAL_MIN > 0
-    // strict to report inerval
-    if (now - data->last_rpt_time < CONFIG_PAW3395_REPORT_INTERVAL_MIN) {
+    if (data->report_interval_ms > 0 && now - data->last_rpt_time < data->report_interval_ms) {
         return 0;
     }
-#endif
 
     // divide to report value
     int16_t rx = (int16_t)CLAMP(data->dx, INT16_MIN, INT16_MAX);
@@ -316,9 +311,7 @@ static int paw3395_report_data(const struct device *dev) {
     bool have_y = ry != 0;
 
     if (have_x || have_y) {
-#if CONFIG_PAW3395_REPORT_INTERVAL_MIN > 0
         data->last_rpt_time = now;
-#endif
         data->dx = 0;
         data->dy = 0;
         if (have_x) {
@@ -426,6 +419,7 @@ static int paw3395_init(const struct device *dev) {
 	data->last_rpt_time = 0;
 	data->last_smp_time = 0;
 	data->dx = data->dy = 0;
+    data->report_interval_ms = CONFIG_PAW3395_REPORT_INTERVAL_MIN;
 
     k_work_schedule(&data->init_work, K_MSEC(async_init_delay[data->async_init_step]));
 
@@ -460,6 +454,10 @@ static int paw3395_attr_set(const struct device *dev, enum sensor_channel chan,
     case PAW3395_ATTR_CALIBRATE:
         // doesn't work so commented for now
         // err = paw3395_lib_calibrate(&config->spi, CONFIG_PAW3395_CALIBRATION_TIMEOUT_MS);
+        break;
+    case PAW3395_ATTR_REPORT_INTERVAL_MS:
+        data->report_interval_ms = val->val1;
+        LOG_INF("report_interval_ms set to %d", data->report_interval_ms);
         break;
 
     default:

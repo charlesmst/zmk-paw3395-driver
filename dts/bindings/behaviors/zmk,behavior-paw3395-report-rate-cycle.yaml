@@ -1,0 +1,33 @@
+# Copyright (c) 2025 The ZMK Contributors
+# SPDX-License-Identifier: MIT
+
+description: |
+  Cycles the PAW3395 sensor's runtime report interval on each key press.
+  Define preset intervals in milliseconds; the behavior advances through
+  them in order, wrapping around. Useful for toggling between 120 Hz (8 ms),
+  250 Hz (4 ms), and 1000 Hz (1 ms) on a dedicated DPI/rate button.
+
+  Example:
+    paw3395_rrc: paw3395_rrc {
+        compatible = "zmk,behavior-paw3395-report-rate-cycle";
+        #binding-cells = <0>;
+        sensor = <&mou0>;
+        rates-ms = <8 4 1>;
+    };
+
+compatible: "zmk,behavior-paw3395-report-rate-cycle"
+
+include: zero_param.yaml
+
+properties:
+  sensor:
+    type: phandle
+    required: true
+    description: phandle to the PAW3395 sensor device node
+
+  rates-ms:
+    type: array
+    required: true
+    description: >
+      Ordered list of report-interval values in milliseconds to cycle through.
+      0 = no limit (unlimited rate).

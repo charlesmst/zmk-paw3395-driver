@@ -56,9 +56,18 @@ config PAW3395_REPORT_INTERVAL_MIN
 	int "PAW3395's default minimum report rate"
 	default 0
 	help
-	  Default minimum report interval in milliseconds.
-		Slow down input reporting for hid queue over the air.
-		Turn value down to 8ms to get sharp response if use with USB only.
+	  Default minimum report interval in milliseconds (startup default).
+	  Can be changed at runtime via PAW3395_ATTR_REPORT_INTERVAL_MS.
+	  0 = no rate limit; 8 = 120 Hz; 4 = 250 Hz; 1 = 1000 Hz.
+
+config PAW3395_REPORT_RATE_CYCLE
+    bool "PAW3395 report-rate cycle behavior"
+    default y
+    depends on ZMK_BEHAVIOR_METADATA || !ZMK_BEHAVIOR_METADATA
+    depends on DT_HAS_ZMK_BEHAVIOR_PAW3395_REPORT_RATE_CYCLE_ENABLED
+    help
+      Enables a ZMK key behavior that cycles the PAW3395 report interval
+      through a user-defined list of millisecond values on each press.
 
 module = PAW3395
 module-str = PAW3395
