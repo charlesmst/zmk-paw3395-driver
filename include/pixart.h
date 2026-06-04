@@ -68,6 +68,11 @@ struct pixart_config {
     uint16_t init_retry_interval;
     uint8_t power_mode;
 
+#if defined(CONFIG_PAW3395_OUTPUT_RATE_NOTIFY)
+    int32_t usb_rate_ms; /* report_interval_ms when USB is active */
+    int32_t ble_rate_ms; /* report_interval_ms when BLE is active */
+#endif
+
 #if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
     struct gpio_dt_spec rate_cycle_gpio;
     const int32_t *rate_cycle_rates_ms;

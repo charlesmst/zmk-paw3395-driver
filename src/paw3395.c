@@ -474,7 +474,14 @@ static int paw3395_init(const struct device *dev) {
 	data->last_rpt_time = 0;
 	data->last_smp_time = 0;
 	data->dx = data->dy = 0;
+#if defined(CONFIG_PAW3395_OUTPUT_RATE_NOTIFY)
+    /* Boot at USB (high-performance) rate; central will notify if BLE is active. */
+    data->report_interval_ms = ((const struct pixart_config *)dev->config)->usb_rate_ms > 0
+                                    ? ((const struct pixart_config *)dev->config)->usb_rate_ms
+                                    : CONFIG_PAW3395_REPORT_INTERVAL_MIN;
+#else
     data->report_interval_ms = CONFIG_PAW3395_REPORT_INTERVAL_MIN;
+#endif
 
     k_work_schedule(&data->init_work, K_MSEC(async_init_delay[data->async_init_step]));
 
@@ -549,6 +556,14 @@ static const struct sensor_driver_api paw3395_driver_api = {
 #define PAW3395_SPI_MODE (SPI_WORD_SET(8) | SPI_MODE_CPOL | SPI_MODE_CPHA | SPI_TRANSFER_MSB |     \
                           SPI_OP_MODE_MASTER | SPI_HOLD_ON_CS | SPI_LOCK_ON)
 
+#if defined(CONFIG_PAW3395_OUTPUT_RATE_NOTIFY)
+#define PAW3395_OUTPUT_RATE_CFG(n) \
+        .usb_rate_ms = DT_INST_PROP_OR(n, usb_rate_ms, 1), \
+        .ble_rate_ms = DT_INST_PROP_OR(n, ble_rate_ms, 8),
+#else
+#define PAW3395_OUTPUT_RATE_CFG(n)
+#endif
+
 #if defined(CONFIG_PAW3395_RATE_CYCLE_GPIO)
 #define PAW3395_RATE_CYCLE_RATES(n)                                                                \
     static const int32_t rate_cycle_rates_##n[] =                                                  \
@@ -580,6 +595,7 @@ static const struct sensor_driver_api paw3395_driver_api = {
         .init_retry_count = DT_PROP(DT_DRV_INST(n), init_retry_count),                             \
         .init_retry_interval = DT_PROP(DT_DRV_INST(n), init_retry_interval),                       \
         .power_mode = DT_PROP(DT_DRV_INST(n), power_mode),                                         \
+        PAW3395_OUTPUT_RATE_CFG(n)                                                                  \
         PAW3395_RATE_CYCLE_CFG(n)                                                                   \
     };                                                                                             \
     DEVICE_DT_INST_DEFINE(n, paw3395_init, NULL, &data##n, &config##n, POST_KERNEL,                \
@@ -611,3 +627,29 @@ static int on_activity_state(const zmk_event_t *eh) {
 
 ZMK_LISTENER(zmk_paw3395_idle_sleeper, on_activity_state);
 ZMK_SUBSCRIPTION(zmk_paw3395_idle_sleeper, zmk_activity_state_changed);
+
+#if defined(CONFIG_PAW3395_OUTPUT_RATE_NOTIFY)
+#include <zmk/events/peripheral_transport_changed.h>
+#include <zmk/endpoints_types.h>
+
+static int paw3395_on_transport_changed(const zmk_event_t *eh) {
+    const struct zmk_peripheral_transport_changed *ev = as_zmk_peripheral_transport_changed(eh);
+    if (!ev) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(paw3395_devs); i++) {
+        const struct pixart_config *config = paw3395_devs[i]->config;
+        struct pixart_data *data = paw3395_devs[i]->data;
+        int32_t rate_ms = (ev->transport == ZMK_TRANSPORT_USB) ? config->usb_rate_ms
+                                                                : config->ble_rate_ms;
+        if (rate_ms > 0) {
+            data->report_interval_ms = rate_ms;
+            LOG_INF("PAW3395 transport=%d → report_interval=%dms", ev->transport, rate_ms);
+        }
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(zmk_paw3395_transport, paw3395_on_transport_changed);
+ZMK_SUBSCRIPTION(zmk_paw3395_transport, zmk_peripheral_transport_changed);
+#endif /* CONFIG_PAW3395_OUTPUT_RATE_NOTIFY */

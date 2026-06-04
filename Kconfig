@@ -60,6 +60,15 @@ config PAW3395_REPORT_INTERVAL_MIN
 	  Can be changed at runtime via PAW3395_ATTR_REPORT_INTERVAL_MS.
 	  0 = no rate limit; 8 = 120 Hz; 4 = 250 Hz; 1 = 1000 Hz.
 
+config PAW3395_OUTPUT_RATE_NOTIFY
+    bool "PAW3395 adjust report-rate on USB/BLE transport change"
+    default n
+    help
+      When the ESB central switches between USB and BLE output it broadcasts
+      a TRANSPORT_CHANGED command. Enable this to have the PAW3395 driver
+      subscribe and set report_interval_ms to usb-rate-ms or ble-rate-ms
+      from the sensor DTS node. Boot default is the USB rate.
+
 config PAW3395_RATE_CYCLE_GPIO
     bool "PAW3395 hardware rate-cycle GPIO button"
     default n
