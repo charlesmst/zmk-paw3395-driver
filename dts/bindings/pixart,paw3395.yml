@@ -49,14 +49,12 @@ properties:
   usb-rate-ms:
     type: int
     description: |
-      Report-interval (ms) when the central is on USB.
-      Used with CONFIG_PAW3395_OUTPUT_RATE_NOTIFY. Also sets the boot default.
+      Report-interval (ms) used as the boot default.
       1 = 1000 Hz, 4 = 250 Hz, 8 = 120 Hz.
   ble-rate-ms:
     type: int
     description: |
-      Report-interval (ms) when the central is on BLE.
-      Used with CONFIG_PAW3395_OUTPUT_RATE_NOTIFY.
+      Optional BLE report-interval hint for configs that use out-of-tree transport switching.
       1 = 1000 Hz, 4 = 250 Hz, 8 = 120 Hz.
   rate-cycle-gpios:
     type: phandle-array

@@ -475,7 +475,7 @@ static int paw3395_init(const struct device *dev) {
 	data->last_smp_time = 0;
 	data->dx = data->dy = 0;
 #if defined(CONFIG_PAW3395_OUTPUT_RATE_NOTIFY)
-    /* Boot at USB (high-performance) rate; central will notify if BLE is active. */
+    /* Boot at the configured high-performance report interval. */
     data->report_interval_ms = ((const struct pixart_config *)dev->config)->usb_rate_ms > 0
                                     ? ((const struct pixart_config *)dev->config)->usb_rate_ms
                                     : CONFIG_PAW3395_REPORT_INTERVAL_MIN;
@@ -627,29 +627,3 @@ static int on_activity_state(const zmk_event_t *eh) {
 
 ZMK_LISTENER(zmk_paw3395_idle_sleeper, on_activity_state);
 ZMK_SUBSCRIPTION(zmk_paw3395_idle_sleeper, zmk_activity_state_changed);
-
-#if defined(CONFIG_PAW3395_OUTPUT_RATE_NOTIFY)
-#include <zmk/events/peripheral_transport_changed.h>
-#include <zmk/endpoints_types.h>
-
-static int paw3395_on_transport_changed(const zmk_event_t *eh) {
-    const struct zmk_peripheral_transport_changed *ev = as_zmk_peripheral_transport_changed(eh);
-    if (!ev) {
-        return ZMK_EV_EVENT_BUBBLE;
-    }
-    for (size_t i = 0; i < ARRAY_SIZE(paw3395_devs); i++) {
-        const struct pixart_config *config = paw3395_devs[i]->config;
-        struct pixart_data *data = paw3395_devs[i]->data;
-        int32_t rate_ms = (ev->transport == ZMK_TRANSPORT_USB) ? config->usb_rate_ms
-                                                                : config->ble_rate_ms;
-        if (rate_ms > 0) {
-            data->report_interval_ms = rate_ms;
-            LOG_INF("PAW3395 transport=%d → report_interval=%dms", ev->transport, rate_ms);
-        }
-    }
-    return ZMK_EV_EVENT_BUBBLE;
-}
-
-ZMK_LISTENER(zmk_paw3395_transport, paw3395_on_transport_changed);
-ZMK_SUBSCRIPTION(zmk_paw3395_transport, zmk_peripheral_transport_changed);
-#endif /* CONFIG_PAW3395_OUTPUT_RATE_NOTIFY */
